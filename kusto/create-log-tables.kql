@@ -1,0 +1,13 @@
+// Run these commands in your Azure Data Explorer (Kusto) database to
+// provision a unified table and JSON ingestion mapping for all demo logs.
+// Adjust the database name as required before executing.
+
+.create table UnifiedLogs (log:dynamic, tag:string, timestamp:datetime)
+
+.alter table UnifiedLogs policy ingestionbatching @'{"MaximumBatchingTimeSpan":"00:05:00","MaximumNumberOfItems":1000,"MaximumRawDataSizeMB":10}'
+
+// Summarize log count by app every 5 min 
+.create-or-alter function with (folder="FluentBit") UnifiedLogSummary() {
+    UnifiedLogs
+    | summarize Count = count() by tag , bin(timestamp,5m)
+}

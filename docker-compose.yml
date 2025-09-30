@@ -1,0 +1,60 @@
+services:
+  dotnet-app:
+    build:
+      context: ./dotnet-app
+    image: dotnet-log-producer:latest
+    environment:
+      DOTNET_LOG_PATH: /logs/dotnet-app.log
+      LOG_INTERVAL_SECONDS: 0.1
+      APP_NAME: dotnet-log-producer
+    volumes:
+      - app-logs:/logs
+    restart: unless-stopped
+
+  java-app:
+    build:
+      context: ./java-app
+    image: java-log-producer:latest
+    environment:
+      JAVA_LOG_PATH: /logs/java-app.log
+      LOG_INTERVAL_SECONDS: 0.1
+      APP_NAME: java-log-producer
+    volumes:
+      - app-logs:/logs
+    restart: unless-stopped
+
+  shell-app:
+    build:
+      context: ./shell-app
+    image: shell-log-generator:latest
+    environment:
+      LOG_PATH: /logs/shell-access.log
+      SLEEP_INTERVAL: 0.001
+    volumes:
+      - app-logs:/logs
+    restart: unless-stopped
+
+  fluent-bit:
+    image: fluent/fluent-bit:4.1.0
+    depends_on:
+      - dotnet-app
+      - java-app
+      - shell-app
+    volumes:
+      - app-logs:/var/log/app
+      - fluent-bit-state:/fluent-bit/state
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+    environment:
+      KUSTO_TENANT_ID: ${KUSTO_TENANT_ID}
+      KUSTO_CLIENT_ID: ${KUSTO_CLIENT_ID}
+      KUSTO_CLIENT_SECRET: ${KUSTO_CLIENT_SECRET}
+      KUSTO_INGESTION_URL: ${KUSTO_INGESTION_URL}
+      KUSTO_DATABASE: ${KUSTO_DATABASE}
+      KUSTO_TABLE: ${KUSTO_TABLE}
+    command: ["/fluent-bit/bin/fluent-bit", "-c", "/fluent-bit/etc/fluent-bit.conf"]
+    restart: unless-stopped
+
+volumes:
+  app-logs:
+  fluent-bit-state:
